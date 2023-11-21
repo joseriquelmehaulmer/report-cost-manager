@@ -2,7 +2,7 @@ import { app } from '@azure/functions';
 import { main } from '../app.js';
 
 app.timer('timerTrigger1', {
-  schedule: '0 0 17 * * *',
+  schedule: '0 0 18 * * *',
   handler: async (myTimer, context) => {
     try {
       await main();
