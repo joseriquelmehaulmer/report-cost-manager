@@ -1,0 +1,25 @@
+{
+  "name": "automation_costs_azure",
+  "author": {
+    "name": "José Riquelme Aravena"
+  },
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "start": "func start",
+    "dev": "nodemon src/app.js"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.0.0",
+    "axios": "^1.6.2",
+    "dotenv": "^16.3.1",
+    "exceljs": "^4.4.0",
+    "moment-timezone": "^0.5.43",
+    "nodemailer": "^6.9.7"
+  },
+  "main": "src/functions/*.js",
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "type": "module"
+}
