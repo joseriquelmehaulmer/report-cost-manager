@@ -7,28 +7,48 @@ import { getPreviousMonthAndYear } from './dates.js';
 
 export async function exportToExcel(data, subscriptionName) {
   const workbook = new ExcelJS.Workbook();
-  const worksheet = workbook.addWorksheet('Datos');
+  const excelFile = findExcelFilePath();
 
-  // Header style with RGB background color and white text
-  const headerStyle = {
-    font: { bold: true, color: { argb: 'FFFFFFFF' } },
-    alignment: { horizontal: 'center' },
-    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF366090' } },
-    border: { bottom: { style: 'medium', color: { argb: '000000' } } },
-  };
+  if (excelFile) {
+    await workbook.xlsx.readFile(excelFile);
+  }
+  //Cleaning Subscription Name and Creating Worksheet
+  const cleanedSubscriptionName = subscriptionName.replace(/[\\*?:/[\]]/g, '');
+  const worksheet = workbook.addWorksheet(cleanedSubscriptionName);
 
-  const { month, year } = getPreviousMonthAndYear();
-  const title = `Informe de costos: Suscripción ${subscriptionName} ${month} ${year}`;
-
-  // Add a blank row to the beginning
+  // Adding Title and Headings
   worksheet.addRow([]);
+  const { month, year } = getPreviousMonthAndYear();
+  const title = `Informe de costos: Su ${subscriptionName} ${month} ${year}`;
+  addTitleToWorksheet(worksheet, title);
+  worksheet.addRow([]);
+  addHeadersToWorksheet(worksheet);
 
-  // Add title row
+  //Data Processing and Subtotal Calculation
+  const totalRowData = data.pop(); // Extract the last row data for 'TOTAL'
+  data.sort((a, b) => a.Etiqueta.localeCompare(b.Etiqueta)); // Sort the data by 'Etiqueta'
+  addDataAndCalculateSubtotals(worksheet, data);
+
+  //Formatting and Addition of the 'TOTAL' Row
+  const totalRow = worksheet.addRow([`TOTAL SUSCRIPCIÓN: ${subscriptionName}`, '', '', '', '', totalRowData.Costo]);
+  formatTotalRow(worksheet, totalRow);
+
+  //Adjusting Column Widths and Saving the File
+  adjustColumnWidth(worksheet);
+  const fileName = excelFile || `Costos-por-recursos-Suscripción--periodo-${month}-${year}.xlsx`;
+  await workbook.xlsx.writeFile(fileName);
+}
+
+function addTitleToWorksheet(worksheet, title) {
+  // Add the title row and merge cells from A2 to F2
   const titleRow = worksheet.addRow([title]);
   worksheet.mergeCells('A2:F2');
+
+  // Style for the title row
   titleRow.font = { size: 24, bold: true, color: { argb: 'FFFFFFFF' } };
   titleRow.alignment = { vertical: 'middle', horizontal: 'center' };
 
+  // Apply background color to each cell in the title row
   titleRow.eachCell(cell => {
     cell.fill = {
       type: 'pattern',
@@ -36,11 +56,31 @@ export async function exportToExcel(data, subscriptionName) {
       fgColor: { argb: 'FF16365C' },
     };
   });
+}
 
-  // Agrega otra fila en blanco después del título
-  worksheet.addRow([]);
+function addHeadersToWorksheet(worksheet) {
+  const headerStyle = {
+    font: { bold: true, color: { argb: 'FFFFFFFF' } },
+    alignment: { horizontal: 'center' },
+    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF366090' } },
+    border: { bottom: { style: 'medium', color: { argb: '000000' } } },
+  };
 
-  // Border style for data cells
+  // Column titles
+  const headers = ['Suscripción', 'Grupo de recursos', 'Etiqueta(s)', 'Tipo de recurso', 'Nombre de recurso', 'Costo'];
+  const headerRow = worksheet.addRow(headers);
+
+  // Apply the style to each header cell
+  headerRow.eachCell(cell => {
+    cell.font = headerStyle.font;
+    cell.alignment = headerStyle.alignment;
+    cell.fill = headerStyle.fill;
+    cell.border = headerStyle.border;
+  });
+}
+
+function addDataAndCalculateSubtotals(worksheet, data) {
+  // Define border style for data cells
   const dataBorderStyle = {
     border: {
       top: { style: 'thin', color: { argb: '000000' } },
@@ -50,43 +90,22 @@ export async function exportToExcel(data, subscriptionName) {
     },
   };
 
-  // Add headers
-  const headerRow = worksheet.addRow([
-    'Suscripción',
-    'Grupo de recursos',
-    'Etiqueta(s)',
-    'Tipo de recurso',
-    'Nombre de recurso',
-    'Costo',
-  ]);
-  headerRow.eachCell(cell => {
-    cell.font = headerStyle.font;
-    cell.alignment = headerStyle.alignment;
-    cell.fill = headerStyle.fill;
-    cell.border = headerStyle.border;
-  });
-
-  // Extract the last row data for 'TOTAL'
-  const totalRowData = data.pop();
-
-  // Sort the data by 'Etiqueta'
-  data.sort((a, b) => a.Etiqueta.localeCompare(b.Etiqueta));
-
   let currentTag = null;
   let subtotal = 0;
 
-  // Add data, apply styles, and calculate subtotals
+  // Iterate over each data item
   data.forEach(item => {
-    // When the tag changes, insert a subtotal row
+    // Check for a change in tag and add a subtotal row if needed
     if (currentTag && item.Etiqueta !== currentTag) {
       addSubtotalRow(worksheet, currentTag, subtotal, dataBorderStyle);
-      subtotal = 0; // Reset subtotal for the next tag group
+      subtotal = 0; // Reset subtotal for the new tag
     }
 
-    // Set the current tag for comparison in the next iteration
+    // Update the current tag and accumulate cost for the subtotal
     currentTag = item.Etiqueta;
     subtotal += item.Costo;
 
+    // Add the data row and apply styles
     const row = worksheet.addRow([
       item.Suscripción,
       item['Grupo de recursos'],
@@ -96,59 +115,23 @@ export async function exportToExcel(data, subscriptionName) {
       item.Costo,
     ]);
 
+    // Apply border style and currency format to each cell
     row.eachCell((cell, colNumber) => {
       cell.border = dataBorderStyle.border;
-      if (colNumber === 6) cell.numFmt = '"$"#,##0.00'; // Apply currency format
+      if (colNumber === 6) {
+        cell.numFmt = '"$"#,##0.00'; // Currency format for cost column
+      }
     });
   });
 
-  // Insert the last subtotal row if any
+  // Add a final subtotal row for the last tag
   if (currentTag) {
     addSubtotalRow(worksheet, currentTag, subtotal, dataBorderStyle);
   }
-
-  // Add the 'TOTAL' row at the end after all subtotals
-  const totalRow = worksheet.addRow([`TOTAL SUSCRIPCIÓN: ${subscriptionName}`, '', '', '', '', totalRowData.Costo]);
-
-  // Combine cells 'A' to 'E' for row 'TOTAL'
-  const totalRowNumber = totalRow.number;
-  worksheet.mergeCells(totalRowNumber, 1, totalRowNumber, 5); // De 'A' a 'E'
-
-  // Applies styles to row 'TOTAL'
-  totalRow.eachCell((cell, colNumber) => {
-    if (colNumber >= 1 && colNumber <= 6) {
-      cell.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF366092' },
-      };
-      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-      if (colNumber === 6) {
-        cell.numFmt = '"$"#,##0.00';
-      }
-    }
-
-    cell.border = {
-      top: { style: 'medium', color: { argb: '000000' } },
-      bottom: {},
-      right: {},
-    };
-
-    if (colNumber >= 1 && colNumber <= 5) {
-      cell.alignment = { vertical: 'middle', horizontal: 'center' };
-    }
-  });
-
-  // Adjust column width
-  adjustColumnWidth(worksheet);
-
-  // Save the workbook to a file
-  const fileName = `Costos-por-recursos-Suscripción-${subscriptionName}-periodo-${month}-${year}.xlsx`;
-  await workbook.xlsx.writeFile(fileName);
 }
 
 function addSubtotalRow(worksheet, tag, subtotal, borderStyle) {
-  // Inserta una fila para el subtotal
+  // Insert a row for the subtotal
   const subtotalRow = worksheet.addRow([`Subtotal: ${tag}`, '', '', '', '', subtotal]);
 
   // Combine cells 'A' to 'E' for subtotal
@@ -179,6 +162,30 @@ function addSubtotalRow(worksheet, tag, subtotal, borderStyle) {
   });
 }
 
+function formatTotalRow(worksheet, totalRow) {
+  // Combine cells 'A' to 'E' for the 'TOTAL' row
+  const totalRowNumber = totalRow.number;
+  worksheet.mergeCells(totalRowNumber, 1, totalRowNumber, 5);
+
+  // Apply styles to the 'TOTAL' row
+  totalRow.eachCell((cell, colNumber) => {
+    // Set fill, font, and number format for all cells in the row
+    if (colNumber >= 1 && colNumber <= 6) {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF366092' } };
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      if (colNumber === 6) {
+        cell.numFmt = '"$"#,##0.00'; // Currency format for the cost column
+      }
+    }
+
+    // Set the top border style for all cells and align the merged cells
+    cell.border = { top: { style: 'medium', color: { argb: '000000' } }, bottom: {}, right: {} };
+    if (colNumber >= 1 && colNumber <= 5) {
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    }
+  });
+}
+
 function adjustColumnWidth(worksheet) {
   // Adjust column widths based on content
   worksheet.columns.forEach(column => {
@@ -197,7 +204,7 @@ function adjustColumnWidth(worksheet) {
   });
 }
 
-export const findLatestExcelFile = () => {
+export const findExcelFilePath = () => {
   // Get the current file path
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
@@ -222,4 +229,17 @@ export const findLatestExcelFile = () => {
   });
 
   return latestFile ? path.join(dirPath, latestFile) : null;
+};
+
+export const deleteExcelFile = filePath => {
+  if (filePath) {
+    try {
+      fs.unlinkSync(filePath);
+      console.log(`File deleted: ${filePath}`);
+    } catch (error) {
+      console.error(`Error deleting file: ${error.message}`);
+    }
+  } else {
+    console.log('No Excel file found to delete.');
+  }
 };
