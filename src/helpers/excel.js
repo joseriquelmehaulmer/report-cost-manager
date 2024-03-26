@@ -19,7 +19,7 @@ export async function exportToExcel(data, subscriptionName) {
   // Adding Title and Headings
   worksheet.addRow([]);
   const { month, year } = getPreviousMonthAndYear();
-  const title = `Informe de costos: Su ${subscriptionName} ${month} ${year}`;
+  const title = `Informe de costos: ${subscriptionName} ${month} ${year}`;
   addTitleToWorksheet(worksheet, title);
   worksheet.addRow([]);
   addHeadersToWorksheet(worksheet);
@@ -202,6 +202,66 @@ function adjustColumnWidth(worksheet) {
     // Set the column width based on the longest value, with a small extra margin
     column.width = maxLength + 1;
   });
+}
+
+export async function updateExcelWithChangesIfExists(deletedElements, newElements) {
+  const workbook = new ExcelJS.Workbook();
+  const excelFilePath = findExcelFilePath();
+
+  try {
+    await workbook.xlsx.readFile(excelFilePath);
+
+    const addSheetWithData = (workbook, sheetName, data) => {
+      const worksheet = workbook.addWorksheet(sheetName);
+      worksheet.columns = [
+        { header: 'Suscripción', key: 'Suscripción', width: 30 },
+        { header: 'Grupo de recursos', key: 'Grupo de recursos', width: 30 },
+        { header: 'Etiqueta(s)', key: 'Etiqueta', width: 30 },
+        { header: 'Tipo de recurso', key: 'Tipo de recurso', width: 20 },
+        { header: 'Nombre de recurso', key: 'Recurso', width: 30 },
+        { header: 'Costo', key: 'Costo', width: 15, style: { numFmt: '"$"#,##0.00;[Red]"-$"#,##0.00' } },
+      ];
+      worksheet.getRow(1).eachCell(cell => {
+        cell.alignment = { horizontal: 'center' };
+        cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF366090' } };
+        cell.border = {
+          bottom: { style: 'medium', color: { argb: 'FF000000' } },
+        };
+      });
+
+      // Add Rows
+      data.forEach(item => {
+        const row = worksheet.addRow(item);
+        row.eachCell(cell => {
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FF000000' } },
+            left: { style: 'thin', color: { argb: 'FF000000' } },
+            bottom: { style: 'thin', color: { argb: 'FF000000' } },
+            right: { style: 'thin', color: { argb: 'FF000000' } },
+          };
+        });
+      });
+      adjustColumnWidth(worksheet);
+    };
+
+    // Add new sheets with the changes
+    if (deletedElements.length > 0) {
+      addSheetWithData(workbook, 'Gastos eliminados', deletedElements);
+    }
+
+    if (newElements.length > 0) {
+      addSheetWithData(workbook, 'Gastos nuevos', newElements);
+    }
+
+    // Save the changes
+    await workbook.xlsx
+      .writeFile(excelFilePath)
+      .then(() => console.log('Archivo actualizado con éxito.'))
+      .catch(error => console.error('Error al guardar el archivo:', error));
+  } catch (error) {
+    console.error('El archivo no se encontró, no se realizaron cambios.');
+  }
 }
 
 export const findExcelFilePath = () => {

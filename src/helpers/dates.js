@@ -1,11 +1,11 @@
 import moment from 'moment-timezone';
 
-export function getPreviousMonthDates() {
+export function getPreviousMonthDates(previousMonths) {
   const timeZone = 'America/Santiago';
   const todayDate = moment.tz(timeZone);
 
   // Set to the first day of the previous month
-  const startDate = todayDate.subtract(1, 'months').startOf('month').format('YYYY-MM-DD');
+  const startDate = todayDate.subtract(previousMonths, 'months').startOf('month').format('YYYY-MM-DD');
 
   // Set to the last day of the previous month
   const endDate = todayDate.endOf('month').format('YYYY-MM-DD');

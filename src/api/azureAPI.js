@@ -1,8 +1,8 @@
 import axios from 'axios';
 import { getPreviousMonthDates } from '../helpers/dates.js';
 
-export async function getBilling(subscriptionId, token) {
-  const { startDate, endDate } = getPreviousMonthDates();
+export async function getBilling(previousMonths, subscriptionId, token) {
+  const { startDate, endDate } = getPreviousMonthDates(previousMonths);
 
   const baseUrl = `https://management.azure.com/subscriptions/${subscriptionId}/providers/Microsoft.Consumption/usagedetails`;
   const params = `api-version=2023-03-01&startDate=${startDate}&endDate=${endDate}`;

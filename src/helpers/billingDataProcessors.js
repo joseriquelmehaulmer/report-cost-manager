@@ -1,8 +1,11 @@
-import { getBilling, exportToExcel } from './index.js';
+import { getBilling } from './index.js';
 
-export async function processBillingData(subscriptionId, subscriptionName, bearerToken) {
+export async function processBillingData(previousMonths, subscription, bearerToken) {
+  const subscriptionId = subscription.subscriptionId;
+  const subscriptionName = subscription.displayName;
+
   try {
-    const response = await getBilling(subscriptionId, bearerToken);
+    const response = await getBilling(previousMonths, subscriptionId, bearerToken);
     const billingDetails = response.value;
     const costByResource = {};
     const insignificantCostsByTag = {};
@@ -55,8 +58,7 @@ export async function processBillingData(subscriptionId, subscriptionName, beare
       Recurso: '',
       Costo: totalCost,
     });
-
-    await exportToExcel(dataForExcel, subscriptionName);
+    return dataForExcel;
   } catch (error) {
     console.error('Error fetching usage data:', error);
   }
