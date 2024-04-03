@@ -15,6 +15,7 @@ export async function exportToExcel(data, subscriptionName) {
   //Cleaning Subscription Name and Creating Worksheet
   const cleanedSubscriptionName = subscriptionName.replace(/[\\*?:/[\]]/g, '');
   const worksheet = workbook.addWorksheet(cleanedSubscriptionName);
+  console.log(`Exporting data for ${subscriptionName}...`);
 
   // Adding Title and Headings
   worksheet.addRow([]);
@@ -37,6 +38,7 @@ export async function exportToExcel(data, subscriptionName) {
   adjustColumnWidth(worksheet);
   const fileName = excelFile || `Costos-por-recursos-Suscripción--periodo-${month}-${year}.xlsx`;
   await workbook.xlsx.writeFile(fileName);
+  console.log(`Data exported ${subscriptionName} to ${fileName}`);
 }
 
 function addTitleToWorksheet(worksheet, title) {

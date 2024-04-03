@@ -21,15 +21,23 @@ export async function main() {
   const dataLastMonthArray = [];
   const dataBeforeLastMonthArray = [];
 
+  const fileExcel = findExcelFilePath();
+  if (fileExcel) {
+    console.log('Deleting previous excel file...');
+    deleteExcelFile(fileExcel);
+  }
+
   try {
     for (const subscription of subscriptions) {
       // Get data from the last month
+      console.log(`Processing data for subscription: ${subscription.displayName} - last month`);
       let previousMonth = 1;
       const dataLastMonth = await processBillingData(previousMonth, subscription, bearerToken);
       dataLastMonthArray.push(dataLastMonth);
-      exportToExcel(dataLastMonth, subscription.displayName);
+      await exportToExcel(dataLastMonth, subscription.displayName);
 
       // Get data from the month before
+      console.log(`Processing data for subscription: ${subscription.displayName} - before last month`);
       previousMonth = 2;
       const dataBeforeLastMonth = await processBillingData(previousMonth, subscription, bearerToken);
       dataBeforeLastMonthArray.push(dataBeforeLastMonth);
